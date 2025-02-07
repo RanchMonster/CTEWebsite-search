@@ -5,6 +5,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 from scipy.sparse import csr_matrix
 import pandas as pd
+from typing import Optional
 class SearchModel:
     """
     A search model that combines TF-IDF based keyword search with machine learning for ranking results.
@@ -19,7 +20,7 @@ class SearchModel:
         __df (pd.DataFrame): DataFrame containing the document collection
     """
     
-    def __init__(self, data: PageData):
+    def __init__(self, data: PageData,feedback:Optional[FeedBack]):
         """
         Initialize the search model with document collection.
         
@@ -29,7 +30,7 @@ class SearchModel:
         Raises:
             ValueError: If data is not of type PageData
         """
-        if not isinstance(data, PageData):
+        if not isinstance(data, PageData,):
             raise ValueError("data must be a PageData type other data is not supported for this model")
         self.__model = RandomForestRegressor()
         self.__df = pd.DataFrame(data)
