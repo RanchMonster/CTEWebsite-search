@@ -1,0 +1,82 @@
+[
+    {
+        "query": "cake",
+        "url": "site.com/page1",
+        "clicked": 1
+    },
+    {
+        "query": "Machine Learning",
+        "url": "site.com/page2",
+        "clicked": 1
+    },
+    {
+        "query": "Deep Learning",
+        "url": "site.com/page3",
+        "clicked": 1
+    },
+    {
+        "query": "Deep Learning",
+        "url": "site.com/page1",
+        "clicked": 0
+    },
+    {
+        "query": "food",
+        "url": "site.com/page1",
+        "clicked": 1
+    },
+    {
+        "query": "pizza",
+        "url": "site.com/page1",
+        "clicked": 1
+    },
+    {
+        "query": "pizza",
+        "url": "site.com/page2",
+        "clicked": 0
+    },
+    {
+        "query": "Machine Learning",
+        "url": "site.com/page2",
+        "clicked": 1
+    },
+    {
+        "query": "learn to code",
+        "url": "site.net/article2",
+        "clicked": 1
+    },
+    {
+        "query": "learn to code",
+        "url": "site.com/page1",
+        "clicked": 0
+    },
+    {
+        "query": "Machine Learning",
+        "url": "site.com/page1",
+        "clicked": 0
+    },
+    {
+        "query": "AI",
+        "url": "site.com/page1",
+        "clicked": 0
+    },
+    {
+        "query": "Code",
+        "url": "site.com/page1",
+        "clicked": 0
+    },
+    {
+        "query": "Computers",
+        "url": "site.com/page1",
+        "clicked": 0
+    },
+    {
+        "query": "Learn to Cook",
+        "url": "site.com/page1",
+        "clicked": 1
+    },
+    {
+        "query": "Cooking",
+        "url": "site.com/page1",
+        "clicked": 1
+    }
+]
