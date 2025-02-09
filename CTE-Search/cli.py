@@ -1,8 +1,6 @@
 import curses
 from typing import Optional
 from threading import Thread,Lock
-def clear():
-    pass  # No need for clear, curses handles screen rendering
 
 class Menu:
     options: list[str]
