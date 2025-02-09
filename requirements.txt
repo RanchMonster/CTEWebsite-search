@@ -23,7 +23,6 @@ psutil==6.1.1
 ptyprocess==0.7.0
 pure_eval==0.2.3
 Pygments==2.19.1
-pynput==1.7.7
 python-dateutil==2.9.0.post0
 python-xlib==0.33
 pytz==2025.1
