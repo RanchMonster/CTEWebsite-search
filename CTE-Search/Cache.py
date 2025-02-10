@@ -12,7 +12,7 @@ MAP = {}  # The memory map used to manage long-term variables
 
 def load() -> None:
     """
-    Loads the cached model from the binary file.
+    Loads the cached map from the binary file.
     
     :return: None
     """
@@ -25,7 +25,7 @@ def load() -> None:
         print("If you need to reset the model run the wipe to wipe the Cache i")
 def unload() -> None:
     """
-    Saves the current model state to the binary file.
+    Saves the current map state to the binary file.
     
     :return: None
     """
