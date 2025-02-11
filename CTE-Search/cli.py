@@ -1,7 +1,7 @@
 import curses
 import asyncio
 from typing import Optional
-
+from LogManager import *
 class Menu:
     options: list[str]
     max_index: int
@@ -23,46 +23,54 @@ class Menu:
 
 class MainMenu(Menu):
     def __init__(self):
-        self.options = ["hello world", "this kind of works", "does it though"]
+        self.options = ["Model", "Logs", "Exit"]
         self.max_index = len(self.options) - 1
 
     def on_option(self, index):
-        print(self.options[index])  # Can replace with menu navigation logic
-
+        if index == self.max_index:
+            exit(0)
+        
 class Interface:
     def __init__(self):
         self.index = 0
         self.current_menu = MainMenu()
-
+        self.loop = asyncio.get_event_loop()  # Store event loop
+        
     def __re_render(self, stdscr):
         self.current_menu(self.index, stdscr)
 
     async def __on_press(self, stdscr):
-        loop = asyncio.get_event_loop()
-        key = await loop.run_in_executor(None, stdscr.getch)
+        key = stdscr.getch()
+        if key != -1:
 
-        if key == curses.KEY_UP and self.index > 0:
-            self.index -= 1
-        elif key == curses.KEY_DOWN and self.index < self.current_menu.max_index:
-            self.index += 1
-        elif key == 10:  # Enter key
-            menu = self.current_menu.on_option(self.index)
-            if isinstance(menu, Menu):
-                self.index = 0
-                self.current_menu = menu
-        elif key == 27:  # ESC key
-            return False
+            if key == curses.KEY_UP and self.index > 0:
+                self.index -= 1
+            elif key == curses.KEY_DOWN and self.index < self.current_menu.max_index:
+                self.index += 1
+            elif key == 10:  # Enter key
+                menu = self.current_menu.on_option(self.index)
+                if isinstance(menu, Menu):
+                    self.index = 0
+                    self.current_menu = menu
+            elif key == 27:  # ESC key
+                return False
 
+            self.__re_render(stdscr)
+            return True
+        else:
+            return True
+
+    def __menu_loop(self, stdscr):
+        """Sync function to work with curses.wrapper()."""
+        stdscr.nodelay(True)
         self.__re_render(stdscr)
-        return True
 
-    async def __menu_loop(self, stdscr):
-        self.__re_render(stdscr)
-        while await self.__on_press(stdscr):
-            await asyncio.sleep(0)  # Yield control
-
+        while True:
+            future = asyncio.run_coroutine_threadsafe(self.__on_press(stdscr), self.loop)
+            if not future.result():  # Wait for the coroutine to return and check result
+                break
+            curses.napms(50)  # Prevent high CPU usage
+        exit(0)
     async def run(self):
+        debug("Starting CLI")
         await asyncio.to_thread(curses.wrapper, self.__menu_loop)
-
-if __name__ == "__main__":
-    asyncio.run(Interface().run())
