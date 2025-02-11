@@ -3,7 +3,7 @@ import asyncio
 from typing import Optional
 from LogManager import *
 from Cache import CacheHandle
-def get_text_input(stdscr, prompt: str) -> str:
+async def get_text_input(stdscr, prompt: str) -> str:
         """Get text input from the user using curses.
         
         Args:
@@ -39,6 +39,7 @@ def get_text_input(stdscr, prompt: str) -> str:
                     stdscr.clear()
                     stdscr.addstr(prompt + user_input)
                     stdscr.refresh()
+            asyncio.sleep(0)
 
         curses.noecho()  # Disable echoing of typed characters
         return user_input
@@ -109,7 +110,7 @@ class SettingsMenu(Menu):
             return MainMenu()
         
         # Using curses to get text input instead of aioconsole
-        value = get_text_input(self.stdscr, f"Enter the new value for {self.options[index].name}: ")
+        value = await get_text_input(self.stdscr, f"Enter the new value for {self.options[index].name}: ")
         
         self.options[index].value = value
         cache = CacheHandle.load()
