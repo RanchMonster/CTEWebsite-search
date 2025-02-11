@@ -28,17 +28,3 @@ class FeedBack(TypedDict):
     query: str
     url: str
     clicked: str
-class Config(TypedDict):
-    """
-    Configuration settings for SSL/TLS encryption and authentication.
-    
-    Attributes:
-        ssl (bool): Flag indicating whether SSL/TLS encryption is enabled
-        key (PathLike): Path to the SSL private key file
-        cert (PathLike): Path to the SSL certificate file
-        address (str): Server address for the application
-    """
-    ssl: bool
-    key:PathLike
-    cert:PathLike
-    address:str
