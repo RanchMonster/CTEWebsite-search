@@ -1,0 +1,11 @@
+{
+    "configurations": [
+        {
+            "name": "Python Debugger:Run Search",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${cwd}/CTE-Search",
+            "console": "integratedTerminal"
+        }
+    ]
+}
