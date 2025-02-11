@@ -14,7 +14,7 @@ class CacheHandle:
     def __new__(cls):
         """Ensure only one instance exists (Singleton)."""
         global cache 
-        if cache  is None:
+        if cache is None:
             instance = super().__new__(cls)
             instance.__map = {}
             cache  = instance
@@ -27,14 +27,17 @@ class CacheHandle:
         if cache  is None:
             try:
                 info("Attempting to load cache  from disk")
-                cache_data = joblib.load("cache .bin")
+                cache_data = joblib.load("cache.bin")
                 instance = super().__new__(cls)
                 instance.__map = cache_data
                 cache  = instance
                 info("cache  LOADED")
             except FileNotFoundError:
-                error("No cache  found. Please retrain the model and save it to continue caching.")
-        return cache 
+                instance = super().__new__(cls)
+                instance.__map = {}
+                cache = instance
+                CacheHandle.unload()
+        return cache
 
     @staticmethod
     def unload() -> None:
@@ -43,7 +46,7 @@ class CacheHandle:
         if cache  is not None:
             try:
                 info("Saving cache  to disk")
-                joblib.dump(cache .__map, "cache .bin")  # Save only the dict
+                joblib.dump(cache .__map, "cache.bin")  # Save only the dict
                 info("cache  successfully saved")
             except Exception as e:
                 error(f"Error saving cache : {str(e)}")
@@ -75,7 +78,7 @@ class CacheHandle:
 
     def __setattr__(self, name, value):
         """Prevents modifying existing values but allows adding new keys."""
-        if name in self.__dict__:  # Internal attributes
+        if name in self.__dict__ or name == "_CacheHandle__map":  # Internal attributes
             object.__setattr__(self, name, value)
         else:
             self.add(name, value)
@@ -89,6 +92,12 @@ class CacheHandle:
 
     def __contains__(self, key):
         return key in self.__map
-
+    def __str__(self):
+        output = {}
+        for key,value in self.__dict__.items():
+            output[key] = value
+        for key,value in self.__map.items():
+            output[key] = value
+        return str(output)
 # Ensure cache  is saved on program exit
 atexit.register(CacheHandle.unload)
