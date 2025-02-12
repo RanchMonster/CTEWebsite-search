@@ -28,3 +28,14 @@ class FeedBack(TypedDict):
     query: str
     url: str
     clicked: str
+class Setting:
+    """Represents a configurable setting with name and value."""
+    def __init__(self, name: str, value: str):
+        """Initialize a setting.
+        
+        Args:
+            name (str): Name of the setting
+            value (str): Value of the setting
+        """
+        self.name = name
+        self.value = value

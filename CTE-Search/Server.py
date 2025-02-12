@@ -1,5 +1,6 @@
 from asyncio import sleep, create_task, get_event_loop
 import websockets as ws
+from Cache import CacheHandle
 from LogManager import *
 async def handle_server(websocket: ws.ServerConnection):
     try:
@@ -15,12 +16,22 @@ async def handle_server(websocket: ws.ServerConnection):
         error(f"disconnected: {str(e)} ")
 
 async def start_server():
+    cache = CacheHandle.load()
+    # set the values in this context so we can change the refernce to it later
+    adrrs = "0.0.0.0" # Set the default value so there is no error
+    port = None # This can be none by default
+    if "settings" in cache:
+        for x in cache.settings:
+            if x.name == "address":
+                adrrs = x.value
+            elif x.name == "port":
+                port == port
     server = await ws.serve(
         handler=handle_server,
-        host="0.0.0.0",
-        port=8765  # Specify your desired port
+        host=adrrs,
+        port=port
     )
-    info("WebSocket server started on ws://0.0.0.0:8765")
+    info(f"WebSocket server started on ws://{adrrs}:{port or "80"}")
     await server.wait_closed()
     info("Server closed")
 
