@@ -1,8 +1,12 @@
+
 import curses
 import asyncio
 from typing import Optional
 from LogManager import *
 from Cache import CacheHandle
+from platform import platform
+from DataTypes import Setting
+from Server import start_server
 async def get_text_input(stdscr, prompt: str) -> str:
         """Get text input from the user using curses.
         
@@ -23,23 +27,28 @@ async def get_text_input(stdscr, prompt: str) -> str:
             key = stdscr.getch()
             if key == -1:
                 continue
-            if key == 10:  # Enter key
+            if key == 10 or key == 13:  # Enter key (10 for Unix, 13 for Windows)
                 break
             elif key == 27:  # ESC key
                 user_input = ''
                 break
-            elif key == curses.KEY_BACKSPACE:  # Backspace key
-                user_input = user_input[:-1]
-                stdscr.clear()
-                stdscr.addstr(prompt + user_input)
-                stdscr.refresh()
+            elif key in (curses.KEY_BACKSPACE, 8, 127):  # Backspace key (8 for Windows, 127 for Unix)
+                if len(user_input) > 0:
+                    user_input = user_input[:-1]
+                    stdscr.clear()
+                    stdscr.addstr(prompt + user_input)
+                    stdscr.refresh()
+                if len(user_input) ==0:
+                    stdscr.clear()
+                    stdscr.addstr(prompt + user_input)
+                    stdscr.refresh()
             else:
                 if chr(key).isascii():
                     user_input += chr(key)
                     stdscr.clear()
                     stdscr.addstr(prompt + user_input)
                     stdscr.refresh()
-            asyncio.sleep(0)
+            await asyncio.sleep(0)
 
         curses.noecho()  # Disable echoing of typed characters
         return user_input
@@ -78,17 +87,7 @@ class Menu:
         """
         raise NotImplementedError("Menu is an abstract class")
 
-class Setting:
-    """Represents a configurable setting with name and value."""
-    def __init__(self, name: str, value: str):
-        """Initialize a setting.
-        
-        Args:
-            name (str): Name of the setting
-            value (str): Value of the setting
-        """
-        self.name = name
-        self.value = value
+
 
 class SettingsMenu(Menu):
     """Menu for managing application settings."""
@@ -127,12 +126,13 @@ class SettingsMenu(Menu):
             list[Setting]: List of available settings
         """
         try:
-            cache = CacheHandle()
-            if "Settings" in cache:
-                return cache["Settings"]
+            cache = CacheHandle.load()
+            if "settings" in cache:
+                return cache.settings
             return [
                 Setting("ssl", "false"),
                 Setting("address", "0.0.0.0"),
+                Setting("port",""),
                 Setting("cert", ""),
                 Setting("key", "")
             ]
@@ -164,9 +164,9 @@ class MainMenu(Menu):
     """Main application menu."""
     def __init__(self):
         """Initialize main menu with primary options."""
-        self.options = ["Settings", "Logs", "Exit"]
+        self.options = ["Settings", "Start Server", "Exit"]
         self.max_index = len(self.options) - 1
-
+        self.task = None
     async def on_option(self, index: int) -> Optional[Menu]:
         """Handle main menu option selection.
         
@@ -178,12 +178,18 @@ class MainMenu(Menu):
         """
         if self.options[index] == "Settings":
             return SettingsMenu()
-        if self.options[index] == "Logs":
+        if self.options[index] == "Start Server":
             pass  # TODO: Implement logs menu
         if self.options[index] == "Exit":
+            await asyncio.gather()
             exit(0)
+            
         return None
-
+    async def __toggle_server(self):
+        if self.task:
+            self.task.cancel()
+        else:
+            self.task = asyncio.create_task(start_server())
 class Interface:
     """Main interface controller handling menu navigation and input."""
     def __init__(self):
@@ -209,7 +215,7 @@ class Interface:
                 self.index -= 1
             elif key == curses.KEY_DOWN and self.index < self.current_menu.max_index:
                 self.index += 1
-            elif key == 10:  # Enter key
+            elif key == 10 or key == 13:  # Enter key (10 for Unix, 13 for Windows)
                 menu = await self.current_menu.on_option(self.index)
                 if isinstance(menu, Menu):
                     self.index = 0
@@ -218,6 +224,7 @@ class Interface:
                 self.__re_render()
                 return True
             elif key == 27:  # ESC key
+                await asyncio.gather()
                 return False
 
             self.__re_render()
