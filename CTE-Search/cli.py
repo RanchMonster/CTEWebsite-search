@@ -176,19 +176,31 @@ class MainMenu(Menu):
         Returns:
             Optional[Menu]: New menu to display or None
         """
-        if self.options[index] == "Settings":
-            return SettingsMenu()
-        if self.options[index] == "Start Server":
-            pass  # TODO: Implement logs menu
-        if self.options[index] == "Exit":
+        if index == 0:
+            if self.task:
+                self.stdscr.addstr("Please Stop Server before attempting to change settings")
+                self.stdscr.refresh()
+                await asyncio.sleep(1)
+            else:
+                return SettingsMenu()
+        elif index == 1:
+            await self.__toggle_server()
+
+        elif index == 2:
             await asyncio.gather()
             exit(0)
             
         return None
+    def __call__(self, index, stdscr):
+        self.stdscr = stdscr
+        return super().__call__(index, stdscr)
     async def __toggle_server(self):
         if self.task:
+            self.options[1] = "Start Server"
             self.task.cancel()
+            self.task = None
         else:
+            self.options[1] = "Stop Server"
             self.task = asyncio.create_task(start_server())
 class Interface:
     """Main interface controller handling menu navigation and input."""
