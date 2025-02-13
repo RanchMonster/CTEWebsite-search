@@ -87,7 +87,16 @@ class Menu:
         """
         raise NotImplementedError("Menu is an abstract class")
 
-
+# class ModelMenu(Menu):
+#     def __init__(self):
+#         self.options = ["Train","Status","Wipe","Back"]
+#         self.max_index = len(self.options) - 1
+#     async def on_option(self, index:int) -> Optional[Menu]:
+#         if index == 0:
+#             pass
+#         if index == 1:
+#             print(f"Model Trained: {"model" in CacheHandle.load() and CacheHandle.load().model.status() == "ready"}")
+#         else:pass
 
 class SettingsMenu(Menu):
     """Menu for managing application settings."""
@@ -132,7 +141,7 @@ class SettingsMenu(Menu):
             return [
                 Setting("ssl", "false"),
                 Setting("address", "0.0.0.0"),
-                Setting("port",""),
+                Setting("port","80"),
                 Setting("cert", ""),
                 Setting("key", "")
             ]
