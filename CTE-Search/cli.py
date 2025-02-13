@@ -87,17 +87,16 @@ class Menu:
         """
         raise NotImplementedError("Menu is an abstract class")
 
-# class ModelMenu(Menu):
-#     def __init__(self):
-#         self.options = ["Train","Status","Wipe","Back"]
-#         self.max_index = len(self.options) - 1
-#     async def on_option(self, index:int) -> Optional[Menu]:
-#         if index == 0:
-#             pass
-#         if index == 1:
-#             print(f"Model Trained: {"model" in CacheHandle.load() and CacheHandle.load().model.status() == "ready"}")
-#         else:pass
-
+class ModelMenu(Menu):
+    def __init__(self):
+        self.options = ["Train","Status","Wipe","Back"]
+        self.max_index = len(self.options) - 1
+    async def on_option(self, index:int) -> Optional[Menu]:
+        if index == 0:
+            pass
+        if index == 1:
+            print(f"Model Trained: {"model" in CacheHandle.load() and CacheHandle.load().model.status() == "ready"}")
+        else:pass
 class SettingsMenu(Menu):
     """Menu for managing application settings."""
     def __init__(self):
@@ -115,17 +114,22 @@ class SettingsMenu(Menu):
             Optional[Menu]: New menu to display or None
         """
         if self.options[index] == "Back":
-            return MainMenu()
+            return -1
         
-        # Using curses to get text input instead of aioconsole
-        value = await get_text_input(self.stdscr, f"Enter the new value for {self.options[index].name}: ")
-        
-        self.options[index].value = value
+        setting:Setting = self.options[index]
+        try:
+            setting.value =await get_text_input(self.stdscr, f"Enter the new value for {self.options[index].name}: ")
+
+        except Exception as e:
+            error(str(e))
+            self.stdscr.addstr(str(e))
+            self.stdscr.refresh()
+        self.options[index] = setting
         cache = CacheHandle.load()
         del cache.settings
         cache.settings = self.options[:-1]  # Exclude "Back" option
         debug(str(cache))
-        return self
+        # return self
 
     @staticmethod
     def __load_settings() -> list[Setting]:
@@ -139,11 +143,11 @@ class SettingsMenu(Menu):
             if "settings" in cache:
                 return cache.settings
             return [
-                Setting("ssl", "false"),
-                Setting("address", "0.0.0.0"),
-                Setting("port","80"),
-                Setting("cert", ""),
-                Setting("key", "")
+                Setting("ssl", "bool"),
+                Setting("address", "string"),
+                Setting("port","int"),
+                Setting("cert", "path"),
+                Setting("key","path"),
             ]
         except Exception as e:
             critical(str(e))
@@ -207,6 +211,8 @@ class MainMenu(Menu):
         if self.task:
             self.options[1] = "Start Server"
             self.task.cancel()
+            while self.task.cancelled():
+                asyncio.sleep(0)
             self.task = None
         else:
             self.options[1] = "Stop Server"
@@ -219,7 +225,7 @@ class Interface:
         self.current_menu = MainMenu()
         self.loop = asyncio.get_event_loop()
         self.stdscr = None
-
+        self.menu_path = []
     def __re_render(self):
         """Refresh the current menu display."""
         self.current_menu(self.index, self.stdscr)
@@ -240,15 +246,23 @@ class Interface:
                 menu = await self.current_menu.on_option(self.index)
                 if isinstance(menu, Menu):
                     self.index = 0
+                    self.menu_path.append(self.current_menu)
                     self.current_menu = menu
+                elif menu == -1:
+                    if len(self.menu_path) >0:
+                        self. current_menu =self.menu_path.pop()
+                        self.index = 0
+                    else:
+                        return False
                 self.stdscr.clear()
                 self.__re_render()
-                return True
             elif key == 27:  # ESC key
-                await asyncio.gather()
-                return False
-
-            self.__re_render()
+                if len(self.menu_path) >0:
+                    self. current_menu =self.menu_path.pop()
+                    self.index = 0
+                else:
+                    return False
+        self.__re_render()
         return True
 
     def __menu_loop(self, stdscr):
