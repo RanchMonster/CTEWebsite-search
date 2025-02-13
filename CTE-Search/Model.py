@@ -1,110 +1,132 @@
-from DataTypes import PageData,FeedBack
+from DataTypes import PageData, FeedBack
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 from scipy.sparse import csr_matrix
 import pandas as pd
-from typing import Optional
+from typing import List, Optional, Tuple, Any
+
 class SearchModel:
-    """
-    A search model that combines TF-IDF based keyword search with machine learning for ranking results.
+    """A search model that combines keyword-based search with machine learning for improved results."""
     
-    This class implements a hybrid search system that uses TF-IDF vectorization for initial keyword matching
-    and a Random Forest model for learning from user feedback to improve search rankings.
-    
-    Attributes:
-        __vectorizer (TfidfVectorizer): TF-IDF vectorizer for converting text to numerical features
-        __model (RandomForestRegressor): Machine learning model for ranking search results
-        __matrix (sparse matrix): TF-IDF matrix of the document collection
-        __df (pd.DataFrame): DataFrame containing the document collection
-    """
-    
-    def __init__(self, data: PageData,feedback:Optional[FeedBack]):
-        """
-        Initialize the search model with document collection.
+    def __init__(self, data: List[PageData]) -> None:
+        """Initialize the search model with page data.
         
         Args:
-            data (PageData): Collection of documents to be indexed
+            data: List of PageData instances containing page information.
             
         Raises:
-            ValueError: If data is not of type PageData
+            ValueError: If data is not a list of PageData instances.
         """
-        if not isinstance(data, PageData,):
-            raise ValueError("data must be a PageData type other data is not supported for this model")
-        self.__model = RandomForestRegressor()
-        self.__df = pd.DataFrame(data)
-        self.__vectorizer = TfidfVectorizer(stop_words="english")
-        self.__matrix = self.__fit_vectorizer()
+        if not all(isinstance(d, PageData) for d in data):
+            raise ValueError("data must be a list of PageData instances")
         
-    def __fit_vectorizer(self) -> object:
-        """
-        Fit the TF-IDF vectorizer on the document collection.
+        self.__model: RandomForestRegressor = RandomForestRegressor()
+        self.__df: pd.DataFrame = pd.DataFrame([d.__dict__ for d in data])
+        self.__vectorizer: TfidfVectorizer = TfidfVectorizer(stop_words="english")
+        self.__matrix: csr_matrix = self.__fit_vectorizer()
+        self.__trained: bool = False
+        self.__feedback_df: pd.DataFrame = pd.DataFrame(columns=['query', 'url', 'clicked'])
+
+    def __fit_vectorizer(self) -> csr_matrix:
+        """Fit the TF-IDF vectorizer on page content.
         
         Returns:
-            sparse matrix: TF-IDF matrix of the document collection
+            A sparse matrix of TF-IDF features.
         """
         return self.__vectorizer.fit_transform(self.__df["content"])
-    
+
     def keyword_search(self, query: str) -> np.ndarray:
-        """
-        Perform keyword-based search using TF-IDF and cosine similarity.
+        """Perform keyword-based search using cosine similarity.
         
         Args:
-            query (str): Search query string
+            query: Search query string.
             
         Returns:
-            np.ndarray: Array of similarity scores for each document
+            Array of similarity scores for each document.
         """
         query_vector = self.__vectorizer.transform([query])
-        similarities = cosine_similarity(query_vector, self.__matrix).flatten()
-        return similarities
-    
-    def learn(self, feedback_df: pd.DataFrame) -> None:
-        """
-        Train the ranking model using user feedback data.
+        return cosine_similarity(query_vector, self.__matrix).flatten()
+
+    def improved_search(self, query: str, filters: Optional[List[str]] = None) -> List[Tuple[str, str, float]]:
+        """Perform improved search combining keyword search with ML-based ranking.
         
         Args:
-            feedback_df (pd.DataFrame): DataFrame containing user feedback with columns:
-                                      'url', 'query', and 'clicked'
+            query: Search query string.
+            filters: Optional list of filter strings to restrict results.
+            
+        Returns:
+            List of tuples containing (url, title, rank_score) sorted by rank score.
         """
+        similarities = self.keyword_search(query)
+        results = []
+        
+        for i, sim in enumerate(similarities):
+            if filters:
+                page_filters = self.__df.iloc[i].get("filters", [])
+                if not any(f in page_filters for f in filters):
+                    continue
+
+            features = np.array([[sim]])
+            rank_score = self.__model.predict(features)[0] if self.__trained else 0
+            results.append((self.__df.iloc[i]["url"], self.__df.iloc[i]["title"], rank_score))
+        
+        return sorted(results, key=lambda x: x[2], reverse=True)
+
+    def append_feedback(self, query: str, picked: FeedBack) -> None:
+        """Append user feedback for search results.
+        
+        Args:
+            query: The search query that generated the results.
+            picked: FeedBack instance containing user interaction data.
+        """
+        new_feedback = {"query": query, "url": picked.url, "clicked": int(picked.clicked)}
+        self.__feedback_df = pd.concat([self.__feedback_df, pd.DataFrame([new_feedback])], ignore_index=True)
+
+    def retrain(self) -> None:
+        """Retrain the model using collected feedback data."""
+        if self.__feedback_df.empty:
+            print("No feedback data available for training.")
+            return
+        
         features = []
         labels = []
-        for index, row in feedback_df.iterrows():
+        for _, row in self.__feedback_df.iterrows():
             doc_index = self.__df[self.__df["url"] == row["url"]].index[0]
             similarity = self.keyword_search(row["query"])[doc_index]
             features.append([similarity])
-            labels.append(row["clicked"])  # 1 if clicked, 0 if ignored
-
-        self.__model.fit(np.array(features), np.array(labels))
+            labels.append(row["clicked"])
         
-    def __reduce__(self):
-        """
-        Enable pickle serialization of the model.
+        self.__model.fit(np.array(features), np.array(labels))
+        self.__trained = True
+
+    def __reduce__(self) -> Tuple[Any, Tuple[RandomForestRegressor, pd.DataFrame, TfidfVectorizer, csr_matrix]]:
+        """Enable pickling of SearchModel instances.
         
         Returns:
-            tuple: Information needed to reconstruct the object
+            Tuple containing rebuild method and necessary arguments.
         """
-        return (SearchModel.rebuild, (self.__model, self.__df, self.__vectorizer, self.__matrix),)
-    
+        return (SearchModel.rebuild, (self.__model, self.__df, self.__vectorizer, self.__matrix))
+
     @classmethod
     def rebuild(cls, model: RandomForestRegressor, df: pd.DataFrame, 
                 vectorizer: TfidfVectorizer, matrix: csr_matrix) -> 'SearchModel':
-        """
-        Reconstruct a SearchModel instance from serialized data.
+        """Rebuild a SearchModel instance from pickled data.
         
         Args:
-            model (RandomForestRegressor): Trained ranking model
-            df (pd.DataFrame): Document collection
-            vectorizer (TfidfVectorizer): Fitted TF-IDF vectorizer
-            matrix (sparse matrix): TF-IDF matrix
+            model: Trained RandomForestRegressor instance.
+            df: DataFrame containing page data.
+            vectorizer: Fitted TfidfVectorizer instance.
+            matrix: TF-IDF feature matrix.
             
         Returns:
-            SearchModel: Reconstructed search model instance
+            Reconstructed SearchModel instance.
         """
         obj = cls.__new__(cls)
         obj.__df = df
         obj.__vectorizer = vectorizer
         obj.__model = model
         obj.__matrix = matrix
+        obj.__trained = True
         return obj
