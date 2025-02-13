@@ -1,48 +1,94 @@
-from asyncio import sleep, create_task, get_event_loop
+from asyncio import sleep, create_task, get_event_loop, to_thread
 import websockets as ws
 from Cache import CacheHandle
 from LogManager import *
+from DataTypes import SearchQuery
+from multiprocessing.pool import Pool
+from typing import Callable
+import json
 
-import time
-def temp_testing():
-    time.sleep(3)
+# Global process pool for handling CPU-intensive tasks
+__POOL = Pool()
+
+async def quick_fork(target: Callable, *args, **kwargs):
+    """
+    Executes a CPU-intensive function in a separate process pool.
+    
+    Args:
+        target (Callable): The function to execute
+        *args: Positional arguments for the target function
+        **kwargs: Keyword arguments for the target function
+        
+    Returns:
+        The result of the target function
+    """
+    return await to_thread(__POOL.apply, target, args, kwargs)
+
+async def handle_search(websocket: ws.ServerConnection):
+    """
+    Handles incoming search requests from websocket clients.
+    
+    Args:
+        websocket (ws.ServerConnection): The websocket connection to the client
+    """
+    model = get_model()
+    if model:
+        query: SearchQuery = json.loads(await websocket.recv())
+        results = await quick_fork(model.improved_search, query["query"], query["filters"])
+        await websocket.send(json.dumps(results))
+    else:
+        critical("Failed to load model")
 
 async def handle_server(websocket: ws.ServerConnection):
+    """
+    Main websocket connection handler that routes requests based on path.
+    
+    Args:
+        websocket (ws.ServerConnection): The websocket connection to handle
+    """
     try:
-        await websocket.send("hello world")
-        while True:
-            message = await websocket.recv()
-            info(f"from: websocket:{websocket.remote_address}  recv:{str(message)}")
-            response = f"Server received: {message}"
-            await asyncio.to_thread(temp_testing) # sim waiting for the model could take longer I am hoping since most of scikit and stuff is in c it will stop the gil from casuing it to be too slow
-            await websocket.send(response)
+        if websocket.request.path == "/search":
+            await handle_search(websocket)
     except ws.ConnectionClosed as e:
-        error(f"disconnected: {str(e)} ")
-async def handle_model(query):
+        error(f"disconnected: {str(e)}")
+
+def get_model():
+    """
+    Retrieves the trained model from cache.
+    
+    Returns:
+        The trained model if available, None otherwise
+    """
     cache = CacheHandle.load()
-    model = None
     if "model" in cache:
-        model = cache.model
-    else: 
+        return cache.model
+    else:
         critical("No trained model stored please retrain")
+        return None
 
 async def start_server():
+    """
+    Initializes and starts the websocket server using configuration from cache.
+    Handles server lifecycle and logging.
+    """
     cache = CacheHandle.load()
-    # set the values in this context so we can change the refernce to it later
-    adrrs = "0.0.0.0" # Set the default value so there is no error
-    port = None # This can be none by default
+    # Default server configuration
+    addr = "0.0.0.0"
+    port = 80  # Set default port to standard websocket port
+
     if "settings" in cache:
-        for x in cache.settings:
-            if x.name == "address":
-                adrrs = x.value
-            elif x.name == "port":
-                port = x.value
+        for setting in cache.settings:
+            if setting.name == "address":
+                addr = setting.value if setting.value != "" else addr
+            elif setting.name == "port":
+                port = setting.value if setting.value != 0 else port
+
     server = await ws.serve(
         handler=handle_server,
-        host=adrrs,
+        host=addr,
         port=int(port)
     )
-    info(f"WebSocket server started on ws://{adrrs}:{port or "80"}")
+    
+    info(f"WebSocket server started on ws://{addr}:{port}")
     await server.wait_closed()
     info("Server closed")
-
