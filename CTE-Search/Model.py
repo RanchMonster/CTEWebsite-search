@@ -23,7 +23,7 @@ class SearchModel:
             raise ValueError("data must be a list of PageData instances")
         
         self.__model: RandomForestRegressor = RandomForestRegressor()
-        self.__df: pd.DataFrame = pd.DataFrame([d.__dict__ for d in data])
+        self.__df: pd.DataFrame = pd.DataFrame(data)
         self.__vectorizer: TfidfVectorizer = TfidfVectorizer(stop_words="english")
         self.__matrix: csr_matrix = self.__fit_vectorizer()
         self.__trained: bool = False
@@ -83,7 +83,7 @@ class SearchModel:
         """
         new_feedback = {"query": query, "url": picked.url, "clicked": int(picked.clicked)}
         self.__feedback_df = pd.concat([self.__feedback_df, pd.DataFrame([new_feedback])], ignore_index=True)
-
+    
     def retrain(self) -> None:
         """Retrain the model using collected feedback data."""
         if self.__feedback_df.empty:
@@ -108,7 +108,16 @@ class SearchModel:
             Tuple containing rebuild method and necessary arguments.
         """
         return (SearchModel.rebuild, (self.__model, self.__df, self.__vectorizer, self.__matrix))
-
+    def append_page_data(self,new_pages:list[PageData]):
+        new_df = pd.DataFrame(new_pages)
+        page_titles = self.__df["title"]
+        for page_title in new_df["title"]:
+            for df_title in page_titles:
+                if page_title == df_title:
+                    raise RuntimeError(f"Invaild Page {page_title} already exist please remove old page or wipe the model to retrain")
+        self.__df = pd.concat(self.__df,new_df)
+        
+        
     @classmethod
     def rebuild(cls, model: RandomForestRegressor, df: pd.DataFrame, 
                 vectorizer: TfidfVectorizer, matrix: csr_matrix) -> 'SearchModel':
