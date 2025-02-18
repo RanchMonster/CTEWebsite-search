@@ -22,7 +22,11 @@ async def quick_fork(target: Callable, *args, **kwargs):
     Returns:
         The result of the target function
     """
-    return await to_thread(__POOL.apply, target, args, kwargs)
+    task =__POOL.apply_async(target, args, kwargs)
+    if not task.ready():
+        await sleep(0)
+    else:
+        return task.get()
 
 async def handle_search(websocket: ws.ServerConnection):
     """
@@ -75,7 +79,6 @@ async def start_server():
     # Default server configuration
     addr = "0.0.0.0"
     port = 80  # Set default port to standard websocket port
-
     if "settings" in cache:
         for setting in cache.settings:
             if setting.name == "address":
