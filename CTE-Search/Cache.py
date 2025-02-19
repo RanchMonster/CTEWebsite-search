@@ -100,6 +100,19 @@ class CacheHandle:
 
     def __repr__(self):
         return repr(self.__dict__)
+def get_model():
+    """
+    Retrieves the trained model from cache.
+    
+    Returns:
+        The trained model if available, None otherwise
+    """
+    cache = CacheHandle.load()
+    if "model" in cache:
+        return cache.model
+    else:
+        critical("No trained model stored please retrain")
+        return None
 
 # Ensure cache is saved on program exit
 atexit.register(CacheHandle.unload)
