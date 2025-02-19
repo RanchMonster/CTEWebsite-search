@@ -7,6 +7,7 @@ This module provides a custom logging implementation with the following features
 - Log level set to DEBUG
 - Formatted log messages with timestamp, level, and message
 - Global logger instance with convenience methods for different log levels
+- Custom error callbacks for handling log messages
 
 The log files are named in the format: logs/cte_search_YYYYMMDD.log
 
@@ -18,14 +19,14 @@ Functions:
     warning(msg) - Logs a warning message
     error(msg) - Logs an error message
     critical(msg) - Logs a critical message
-
-Note: The logger must be initialized by running logger_loop() before using any logging functions.
+    add_error_callback(callback) - Adds a callback function for error handling
 """
 
 from logging import Logger, FileHandler, Formatter
 import os
 from datetime import datetime
 import asyncio
+from typing import Callable, List
 
 # Create logs directory if it doesn't exist
 os.makedirs('logs', exist_ok=True)
@@ -41,6 +42,7 @@ formatter = Formatter('[%(asctime)s] - %(levelname)s - %(message)s')
 __current_date = None
 __file_handler = None
 __ready = False
+__error_callbacks: List[Callable[[str], None]] = []
 
 async def update_file_handler():
     """Periodically updates the log file handler when the date changes."""
@@ -79,6 +81,14 @@ async def logger_loop():
     while True:
         await update_file_handler()
         await asyncio.sleep(60)  # Check every minute
+
+def add_error_callback(callback: Callable[[str], None]):
+    """Add a callback function to be called when errors occur.
+    
+    Args:
+        callback: A function that takes a string parameter containing the error message
+    """
+    __error_callbacks.append(callback)
 
 def info(msg):
     """Log an info level message.
@@ -131,6 +141,11 @@ def error(msg):
     if not __ready:
         raise RuntimeError("Ensure Logger Loop is running before you trying to use logging")
     __LOGGER.error(msg)
+    for callback in __error_callbacks:
+        try:
+            callback(msg)
+        except Exception as e:
+            __LOGGER.error(f"Error callback failed: {e}")
 
 def critical(msg):
     """Log a critical level message.
@@ -144,3 +159,8 @@ def critical(msg):
     if not __ready:
         raise RuntimeError("Ensure Logger Loop is running before you trying to use logging")
     __LOGGER.critical(msg)
+    for callback in __error_callbacks:
+        try:
+            callback(msg)
+        except Exception as e:
+            __LOGGER.error(f"Error callback failed: {e}")
