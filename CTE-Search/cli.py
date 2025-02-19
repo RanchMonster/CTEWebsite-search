@@ -3,10 +3,11 @@ import curses
 import asyncio
 from typing import Optional
 from LogManager import *
-from Cache import CacheHandle
+from Cache import CacheHandle,get_model
 from platform import platform
-from DataTypes import Setting
+from DataTypes import Setting,PageData
 from Server import start_server
+import json
 async def get_text_input(stdscr, prompt: str) -> str:
         """Get text input from the user using curses.
         
@@ -89,14 +90,28 @@ class Menu:
 
 class ModelMenu(Menu):
     def __init__(self):
-        self.options = ["Train","Status","Wipe","Back"]
+        self.options = ["Add Page","Remove Page","Back"]
         self.max_index = len(self.options) - 1
     async def on_option(self, index:int) -> Optional[Menu]:
         if index == 0:
-            pass
-        if index == 1:
-            print(f"Model Trained: {"model" in CacheHandle.load() and CacheHandle.load().model.status() == "ready"}")
-        else:pass
+            model = get_model()
+            new_page:PageData = {}
+            new_page["title"] = get_text_input(self.stdscr,"Enter Page Title: ")
+            new_page["content"] = get_text_input(self.stdscr,"Enter Page Content: ")
+            new_page["filters"] = []
+            filter = get_text_input(self.stdscr,"Enter a filter (leave blank when you are done or hit esc): ")
+            while filter != '':
+                new_page["filters"].append(filter)
+                filter = get_text_input(self.stdscr,"Enter a filter (leave blank when you are done or hit esc): ")
+            new_page["url"] = get_text_input(self.stdscr,"Enter the URL local to the server example /home" )
+            model.append_page_data()
+        elif index == 1:
+            pass #TODO Write the logic to remove the page
+        else:
+            return -1
+    def __call__(self, index, stdscr):
+        self.stdscr = stdscr
+        return super().__call__(index, stdscr)
 class SettingsMenu(Menu):
     """Menu for managing application settings."""
     def __init__(self):
@@ -177,7 +192,7 @@ class MainMenu(Menu):
     """Main application menu."""
     def __init__(self):
         """Initialize main menu with primary options."""
-        self.options = ["Settings", "Start Server", "Exit"]
+        self.options = ["Settings", "Start Server","Model", "Exit"]
         self.max_index = len(self.options) - 1
         self.task = None
     async def on_option(self, index: int) -> Optional[Menu]:
@@ -198,8 +213,10 @@ class MainMenu(Menu):
                 return SettingsMenu()
         elif index == 1:
             await self.__toggle_server()
-
+        
         elif index == 2:
+            return ModelMenu()
+        else:
             await asyncio.gather()
             exit(0)
             
