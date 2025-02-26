@@ -82,7 +82,16 @@ class SearchModel:
             picked: FeedBack instance containing user interaction data.
         """
         new_feedback = {"query": query, "url": picked.url, "clicked": int(picked.clicked)}
-        self.__feedback_df = pd.concat([self.__feedback_df, pd.DataFrame([new_feedback])], ignore_index=True)
+        
+        # Check if identical feedback already exists
+        existing_feedback = self.__feedback_df[
+            (self.__feedback_df["query"] == query) & 
+            (self.__feedback_df["url"] == picked.url) &
+            (self.__feedback_df["clicked"] == int(picked.clicked))
+        ]
+        
+        if existing_feedback.empty:
+            self.__feedback_df = pd.concat([self.__feedback_df, pd.DataFrame([new_feedback])], ignore_index=True)
     
     def retrain(self) -> None:
         """Retrain the model using collected feedback data."""
@@ -108,15 +117,13 @@ class SearchModel:
             Tuple containing rebuild method and necessary arguments.
         """
         return (SearchModel.rebuild, (self.__model, self.__df, self.__vectorizer, self.__matrix))
-    def append_page_data(self,new_pages:list[PageData]):
-        new_df = pd.DataFrame(new_pages)
-        page_titles = self.__df["title"]
-        for page_title in new_df["title"]:
-            for df_title in page_titles:
-                if page_title == df_title:
-                    raise RuntimeError(f"Invaild Page {page_title} already exist please remove old page or wipe the model to retrain")
-        self.__df = pd.concat(self.__df,new_df)
-        
+    def append_page_data(self, new_page: PageData):
+        if new_page.title in self.__df["title"].values:
+            raise RuntimeError(f"Invalid Page {new_page.title} already exists. Please remove old page.")
+        self.__df = pd.concat([self.__df, pd.DataFrame([new_page])], ignore_index=True)
+    
+    def remove_pages(self, title: str):
+        self.__df = self.__df[self.__df["title"] != title]
         
     @classmethod
     def rebuild(cls, model: RandomForestRegressor, df: pd.DataFrame, 

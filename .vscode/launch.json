@@ -5,7 +5,8 @@
             "type": "debugpy",
             "request": "launch",
             "program": "${cwd}/CTE-Search",
-            "console": "integratedTerminal"
+            "console": "integratedTerminal",
+            "justMyCode": false
         }
     ]
 }

@@ -1,6 +1,6 @@
 from asyncio import sleep, create_task, get_event_loop, to_thread
 import websockets as ws
-from Cache import CacheHandle
+from Cache import CacheHandle,get_model
 from LogManager import *
 from DataTypes import SearchQuery
 from multiprocessing.pool import Pool
@@ -56,19 +56,6 @@ async def handle_server(websocket: ws.ServerConnection):
     except ws.ConnectionClosed as e:
         error(f"disconnected: {str(e)}")
 
-def get_model():
-    """
-    Retrieves the trained model from cache.
-    
-    Returns:
-        The trained model if available, None otherwise
-    """
-    cache = CacheHandle.load()
-    if "model" in cache:
-        return cache.model
-    else:
-        critical("No trained model stored please retrain")
-        return None
 
 async def start_server():
     """
