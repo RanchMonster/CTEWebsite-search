@@ -1,74 +1,53 @@
-
 import curses
 import asyncio
-from typing import Optional
 from LogManager import *
-from Cache import CacheHandle,get_model
+from Cache import CacheHandle, get_model
 from platform import platform
-from DataTypes import Setting,PageData
+from DataTypes import Setting, PageData
 from Server import start_server
 import json
-async def get_text_input(stdscr, prompt: str) -> str:
-        """Get text input from the user using curses.
-        
-        Args:
-            stdscr: Curses screen object
-            prompt: The prompt message to display
-        
-        Returns:
-            str: The user input
-        """
-        curses.echo()  # Enable echoing of typed characters
-        stdscr.clear()
-        stdscr.addstr(prompt)
-        stdscr.refresh()
-    
-        user_input = ''
-        while True:
-            key = stdscr.getch()
-            if key == -1:
-                continue
-            if key == 10 or key == 13:  # Enter key (10 for Unix, 13 for Windows)
-                break
-            elif key == 27:  # ESC key
-                user_input = ''
-                break
-            elif key in (curses.KEY_BACKSPACE, 8, 127):  # Backspace key (8 for Windows, 127 for Unix)
-                if len(user_input) > 0:
-                    user_input = user_input[:-1]
-                    stdscr.clear()
-                    stdscr.addstr(prompt + user_input)
-                    stdscr.refresh()
-                if len(user_input) ==0:
-                    stdscr.clear()
-                    stdscr.addstr(prompt + user_input)
-                    stdscr.refresh()
-            else:
-                if chr(key).isascii():
-                    user_input += chr(key)
-                    stdscr.clear()
-                    stdscr.addstr(prompt + user_input)
-                    stdscr.refresh()
-            await asyncio.sleep(0)
 
-        curses.noecho()  # Disable echoing of typed characters
-        return user_input
+async def get_text_input(stdscr, prompt: str) -> str:
+    curses.echo()
+    stdscr.clear()
+    stdscr.addstr(prompt)
+    stdscr.refresh()
+    
+    user_input = ''
+    while True:
+        key = stdscr.getch()
+        if key == -1:
+            continue
+        if key in (10, 13):  # Enter key
+            break
+        elif key == 27:  # ESC key
+            user_input = ''
+            break
+        elif key in (curses.KEY_BACKSPACE, 8, 127):  # Backspace
+            if user_input:
+                user_input = user_input[:-1]
+                stdscr.clear()
+                stdscr.addstr(prompt + user_input)
+                stdscr.refresh()
+        else:
+            if chr(key).isascii():
+                user_input += chr(key)
+                stdscr.clear()
+                stdscr.addstr(prompt + user_input)
+                stdscr.refresh()
+        await asyncio.sleep(0)
+
+    curses.noecho()
+    return user_input
+
 class Menu:
-    """Abstract base class for menu implementations."""
     options: list[str]
     max_index: int
 
     def __init__(self):
-        """Initialize the menu. This is an abstract class and should not be instantiated directly."""
         raise NotImplementedError("Menu is an abstract class")
 
     def __call__(self, index: int, stdscr):
-        """Render the menu on the screen.
-        
-        Args:
-            index (int): Currently selected menu item
-            stdscr: Curses screen object
-        """
         stdscr.clear()
         for x in range(len(self.options)):
             if index == x:
@@ -77,117 +56,108 @@ class Menu:
                 stdscr.addstr(f"{self.options[x]}\n")
         stdscr.refresh()
 
-    async def on_option(self, index: int) -> Optional['Menu']:
-        """Handle menu option selection. Must be implemented by subclasses.
-        
-        Args:
-            index (int): Selected menu item index
-            
-        Returns:
-            Optional[Menu]: New menu to display or None
-        """
+    async def on_option(self, index: int) -> object | None:
         raise NotImplementedError("Menu is an abstract class")
 
 class ModelMenu(Menu):
     def __init__(self):
-        self.options = ["Add Page","Remove Page","Back"]
+        self.options = ["Add Page", "Remove Page", "Back"]
         self.max_index = len(self.options) - 1
-    async def on_option(self, index:int) -> Optional[Menu]:
+
+    async def on_option(self, index: int) -> Menu | None:
         if index == 0:
             model = get_model()
-            new_page:PageData = {}
-            new_page["title"] = get_text_input(self.stdscr,"Enter Page Title: ")
-            new_page["content"] = get_text_input(self.stdscr,"Enter Page Content: ")
+            new_page: PageData = {}
+            new_page["title"] = await get_text_input(self.stdscr, "Enter Page Title: ")
+            new_page["content"] = await get_text_input(self.stdscr, "Enter Page Content: ")
             new_page["filters"] = []
-            filter = get_text_input(self.stdscr,"Enter a filter (leave blank when you are done or hit esc): ")
-            while filter != '':
-                new_page["filters"].append(filter)
-                filter = get_text_input(self.stdscr,"Enter a filter (leave blank when you are done or hit esc): ")
-            new_page["url"] = get_text_input(self.stdscr,"Enter the URL local to the server example /home" )
-            model.append_page_data()
+            filter_input = await get_text_input(self.stdscr, "Enter a filter (leave blank to finish): ")
+            while filter_input:
+                new_page["filters"].append(filter_input)
+                filter_input = await get_text_input(self.stdscr, "Enter a filter (leave blank to finish): ")
+            new_page["url"] = await get_text_input(self.stdscr, "Enter the URL local to the server (e.g., /home): ")
+            model.append_page_data(new_page)
         elif index == 1:
-            pass #TODO Write the logic to remove the page
+            pass  # TODO: Implement page removal
         else:
-            return -1
-    def __call__(self, index, stdscr):
+            return None
+
+    def __call__(self, index: int, stdscr):
         self.stdscr = stdscr
         return super().__call__(index, stdscr)
+
 class SettingsMenu(Menu):
-    """Menu for managing application settings."""
     def __init__(self):
-        """Initialize settings menu with available options."""
         self.options = [*SettingsMenu.__load_settings(), "Back"]
         self.max_index = len(self.options) - 1
 
-    async def on_option(self, index: int) -> Optional[Menu]:
-        """Handle settings menu option selection.
-        
-        Args:
-            index (int): Selected setting index
-            
-        Returns:
-            Optional[Menu]: New menu to display or None
-        """
+    async def on_option(self, index: int) -> Menu | None:
         if self.options[index] == "Back":
-            return -1
-        
-        setting:Setting = self.options[index]
-        try:
-            setting.value =await get_text_input(self.stdscr, f"Enter the new value for {self.options[index].name}: ")
+            return None
 
+        setting: Setting = self.options[index]
+        try:
+            setting.value = await get_text_input(self.stdscr, f"Enter new value for {setting.name}: ")
         except Exception as e:
             error(str(e))
             self.stdscr.addstr(str(e))
             self.stdscr.refresh()
         self.options[index] = setting
         cache = CacheHandle.load()
-        del cache.settings
-        cache.settings = self.options[:-1]  # Exclude "Back" option
+        cache.settings = self.options[:-1]
         debug(str(cache))
-        # return self
 
     @staticmethod
     def __load_settings() -> list[Setting]:
-        """Load settings from cache or return defaults.
-        
-        Returns:
-            list[Setting]: List of available settings
-        """
         try:
             cache = CacheHandle.load()
-            if "settings" in cache:
-                return cache.settings
-            return [
+            return cache.settings if "settings" in cache else [
                 Setting("ssl", "bool"),
                 Setting("address", "string"),
-                Setting("port","int"),
+                Setting("port", "int"),
                 Setting("cert", "path"),
-                Setting("key","path"),
+                Setting("key", "path")
             ]
         except Exception as e:
             critical(str(e))
+            return []
 
-    def __call__(self, index: int, stdscr):
-        """Render the settings menu.
-        
-        Args:
-            index (int): Currently selected setting
-            stdscr: Curses screen object
-        """
-        self.stdscr = stdscr
-        stdscr.clear()
-        for x in range(len(self.options)):
-            if isinstance(self.options[x], Setting):
-                item = f"{self.options[x].name}: {self.options[x].value}"
-            else:
-                item = self.options[x]
-            if index == x:
-                stdscr.addstr(f"{item} <#####\n")
-            else:
-                stdscr.addstr(f"{item}\n")
-        stdscr.refresh()
+class MainMenu(Menu):
+    def __init__(self):
+        self.options = ["Settings", "Start Server", "Model", "Exit"]
+        self.max_index = len(self.options) - 1
+        self.task: asyncio.Task | None = None
 
-    
+    async def on_option(self, index: int) -> Menu | None:
+        if index == 0:
+            if self.task:
+                self.stdscr.addstr("Stop the server before changing settings.")
+                self.stdscr.refresh()
+                await asyncio.sleep(1)
+            else:
+                return SettingsMenu()
+        elif index == 1:
+            await self.__toggle_server()
+        elif index == 2:
+            if self.task:
+                self.stdscr.addstr("Stop the server before changing settings.")
+                self.stdscr.refresh()
+                await asyncio.sleep(1)
+            else:
+                return ModelMenu()
+        else:
+            exit(0)
+        return None
+
+    async def __toggle_server(self):
+        if self.task:
+            self.options[1] = "Start Server"
+            self.task.cancel()
+            self.task = None
+        else:
+            self.options[1] = "Stop Server"
+            self.task = asyncio.create_task(start_server())
+
 class MainMenu(Menu):
     """Main application menu."""
     def __init__(self):
@@ -195,7 +165,7 @@ class MainMenu(Menu):
         self.options = ["Settings", "Start Server","Model", "Exit"]
         self.max_index = len(self.options) - 1
         self.task = None
-    async def on_option(self, index: int) -> Optional[Menu]:
+    async def on_option(self, index: int) -> Menu | None:
         """Handle main menu option selection.
         
         Args:
@@ -300,7 +270,7 @@ class Interface:
         exit(0)
 
     async def run(self):
-        """Start the interface."""
         debug("Starting CLI")
         await asyncio.to_thread(curses.wrapper, self.__menu_loop)
         debug("Closed CLI")
+    

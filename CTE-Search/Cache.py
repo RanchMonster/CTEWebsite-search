@@ -1,6 +1,7 @@
 import joblib
 import atexit
 from LogManager import *  # Assuming this is needed for logging
+from Model import SearchModel
 
 """
 Manages data caching, ensuring we don't retrain the model on every reload.
@@ -111,7 +112,7 @@ def get_model():
     if "model" in cache:
         return cache.model
     else:
-        critical("No trained model stored please retrain")
+        error("No trained model stored Creating empty model will need retrain")
         return None
 
 # Ensure cache is saved on program exit
