@@ -2,7 +2,7 @@ import joblib
 import atexit
 from LogManager import *  # Assuming this is needed for logging
 from Model import SearchModel
-
+from DataTypes import Setting
 """
 Manages data caching, ensuring we don't retrain the model on every reload.
 """
@@ -17,7 +17,15 @@ class CacheHandle:
             instance = super().__new__(cls)
             cache = instance
         return cache 
-    
+    @staticmethod
+    def create_settings()->list[Setting]:
+        return [
+                    Setting("ssl", "bool"),
+                    Setting("address", "string"),
+                    Setting("port", "int"),
+                    Setting("cert", "path"),
+                    Setting("key", "path")
+                ]
     @classmethod
     def load(cls) -> 'CacheHandle':
         """Loads the cache from disk."""
@@ -29,10 +37,13 @@ class CacheHandle:
                 instance = super().__new__(cls)
                 for key, value in cache_data.items():
                     setattr(instance, key, value)
+                if "settings" not in instance or len(instance.settings) == 0:
+                    instance.settings = cls.create_settings()
                 cache = instance
                 info("cache LOADED")
             except FileNotFoundError:
                 instance = super().__new__(cls)
+                instance.settings = cls.create_settings()
                 cache = instance
                 CacheHandle.unload()
         return cache
@@ -52,9 +63,6 @@ class CacheHandle:
 
     def add(self, key, value):
         """Adds a new immutable value (prevents modification of existing values)."""
-        if hasattr(self, key):
-            error(f"Attempted to modify existing key '{key}'")
-            raise ValueError(f"Key '{key}' already exists. Cannot modify existing values.")
         value = frozenset([value]) if isinstance(value, set) else value
         setattr(self, key, value)
         debug(f"Added new key-value pair: {key}")
@@ -78,9 +86,6 @@ class CacheHandle:
 
     def __setattr__(self, name, value):
         """Prevents modifying existing values but allows adding new keys."""
-        if hasattr(self, name):
-            error(f"Attempted to modify existing key '{name}'")
-            raise ValueError(f"Key '{name}' already exists. Cannot modify existing values.")
         object.__setattr__(self, name, value)
 
     def __setitem__(self, key, value):
@@ -113,7 +118,8 @@ def get_model():
         return cache.model
     else:
         error("No trained model stored Creating empty model will need retrain")
-        return None
+        cache.model = SearchModel([])
+        return cache.model
 
 # Ensure cache is saved on program exit
 atexit.register(CacheHandle.unload)
