@@ -25,7 +25,8 @@ class SearchModel:
         self.__model: RandomForestRegressor = RandomForestRegressor()
         self.__df: pd.DataFrame = pd.DataFrame(data)
         self.__vectorizer: TfidfVectorizer = TfidfVectorizer(stop_words="english")
-        self.__matrix: csr_matrix = self.__fit_vectorizer()
+        if len(data) > 0:
+            self.__matrix: csr_matrix = self.__fit_vectorizer()
         self.__trained: bool = False
         self.__feedback_df: pd.DataFrame = pd.DataFrame(columns=['query', 'url', 'clicked'])
 
@@ -118,7 +119,8 @@ class SearchModel:
         """
         return (SearchModel.rebuild, (self.__model, self.__df, self.__vectorizer, self.__matrix))
     def append_page_data(self, new_page: PageData):
-        if new_page.title in self.__df["title"].values:
+
+        if "title" in self.__df and new_page["title"] in self.__df["title"].values:
             raise RuntimeError(f"Invalid Page {new_page.title} already exists. Please remove old page.")
         self.__df = pd.concat([self.__df, pd.DataFrame([new_page])], ignore_index=True)
     
