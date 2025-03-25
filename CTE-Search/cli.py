@@ -2,7 +2,6 @@ import curses
 import asyncio
 from LogManager import *
 from Cache import CacheHandle, get_model
-from platform import platform
 from DataTypes import Setting, PageData
 from Server import start_server
 import json
@@ -64,7 +63,7 @@ class ModelMenu(Menu):
         self.options = ["Add Page", "Remove Page", "Back"]
         self.max_index = len(self.options) - 1
 
-    async def on_option(self, index: int) -> Menu | None:
+    async def on_option(self, index: int) -> Menu | None | int:
         if index == 0:
             model = get_model()
             new_page: PageData = {}
@@ -79,6 +78,8 @@ class ModelMenu(Menu):
             model.append_page_data(new_page)
         elif index == 1:
             pass  # TODO: Implement page removal
+        elif index == self.max_index:
+            return -1
         else:
             return None
 
@@ -91,9 +92,9 @@ class SettingsMenu(Menu):
         self.options = [*SettingsMenu.__load_settings(), "Back"]
         self.max_index = len(self.options) - 1
 
-    async def on_option(self, index: int) -> Menu | None:
+    async def on_option(self, index: int) -> Menu | int | None:
         if self.options[index] == "Back":
-            return None
+            return -1
 
         setting: Setting = self.options[index]
         try:
@@ -106,48 +107,19 @@ class SettingsMenu(Menu):
         cache = CacheHandle.load()
         cache.settings = self.options[:-1]
         debug(str(cache))
-
+        
     @staticmethod
     def __load_settings() -> list[Setting]:
         try:
             cache = CacheHandle.load()
-            return cache.settings if "settings" in cache else [
-                Setting("ssl", "bool"),
-                Setting("address", "string"),
-                Setting("port", "int"),
-                Setting("cert", "path"),
-                Setting("key", "path")
-            ]
+            return cache.settings
         except Exception as e:
             critical(str(e))
             return []
+    def __call__(self, index: int, stdscr):
+        self.stdscr = stdscr
+        return super().__call__(index, stdscr)
 
-class MainMenu(Menu):
-    def __init__(self):
-        self.options = ["Settings", "Start Server", "Model", "Exit"]
-        self.max_index = len(self.options) - 1
-        self.task: asyncio.Task | None = None
-
-    async def on_option(self, index: int) -> Menu | None:
-        if index == 0:
-            if self.task:
-                self.stdscr.addstr("Stop the server before changing settings.")
-                self.stdscr.refresh()
-                await asyncio.sleep(1)
-            else:
-                return SettingsMenu()
-        elif index == 1:
-            await self.__toggle_server()
-        elif index == 2:
-            if self.task:
-                self.stdscr.addstr("Stop the server before changing settings.")
-                self.stdscr.refresh()
-                await asyncio.sleep(1)
-            else:
-                return ModelMenu()
-        else:
-            exit(0)
-        return None
 
     async def __toggle_server(self):
         if self.task:
@@ -241,15 +213,16 @@ class Interface:
                         self.index = 0
                     else:
                         return False
-                self.stdscr.clear()
-                self.__re_render()
             elif key == 27:  # ESC key
                 if len(self.menu_path) >0:
                     self. current_menu =self.menu_path.pop()
                     self.index = 0
                 else:
                     return False
-        self.__re_render()
+            self.stdscr.clear()
+            self.__re_render()
+        else:
+            pass
         return True
 
     def __menu_loop(self, stdscr):
