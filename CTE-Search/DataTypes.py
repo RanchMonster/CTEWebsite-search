@@ -31,18 +31,17 @@ class FeedBack(TypedDict):
 class SearchQuery(TypedDict):
     query:str
     filters:Optional[list[str]]
-SETTING_TYPES = Literal["string","path","bool","int","float"]
+
 class Setting:
     """Represents a configurable setting with name and value."""
-    def __init__(self, name: str,type = SETTING_TYPES):
+    def __init__(self, name: str,type = Literal["string","path","bool","int","float"]):
         """Initialize a setting.
         
         Args:
             name (str): Name of the setting
             value (str): Value of the setting
         """
-        if type is SETTING_TYPES:
-            raise TypeError(f"Invaild Type for setting {name}")
+       
         self.name = name
         self.__type = type
         self.__value = self.__default()
@@ -66,6 +65,8 @@ class Setting:
             return int(self.__value)
         else:
             return float(self.__value)
+    def __str__(self) -> str:
+        return f"{self.name}: {self.value}"
     @value.setter
     def value(self, new_value: str):
         if self.__type == "bool":
